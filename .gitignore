@@ -1,0 +1,14 @@
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.env
+.venv/
+pgdata/
+*.log
+.DS_Store
+.tools/
+frontend/dist/
+backend/data/
+backend/uploads/
+backend/dot_local.db
