@@ -1,0 +1,14 @@
+**/.venv
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/.env
+**/*.db
+**/uploads/*
+.git
+.tools
+.cursor
+.vscode
+*.log
+backend/reset_emails.log
+SUPERADMIN.txt

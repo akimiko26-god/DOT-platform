@@ -1,18 +1,19 @@
-# Free tier on Render.com (https://render.com)
-# 1. Push repo to GitHub
-# 2. New -> Blueprint -> connect repo
-# 3. After deploy open the service URL
+# Render Blueprint — https://dashboard.render.com/blueprint/new
+# Repo: akimiko26-god/DOT-platform, branch: main
 
 services:
   - type: web
     name: dot-platform
     runtime: docker
     plan: free
+    region: frankfurt
+    branch: main
     healthCheckPath: /api/health
+    autoDeploy: true
     envVars:
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
         value: sqlite:////app/backend/data/dot.db
-      - key: PYTHON_VERSION
-        value: "3.12.0"
+      - key: PYTHONUNBUFFERED
+        value: "1"

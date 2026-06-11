@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7
     frontend_url: str = _default_frontend_url()
-    api_public_url: str = "http://localhost:8000"
+    api_public_url: str = _default_frontend_url()
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_user: str = ""
