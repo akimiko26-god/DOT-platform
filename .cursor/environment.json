@@ -1,0 +1,25 @@
+{
+  "name": "dot-platform",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+  "install": "python3 -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requirements.txt && npm ci --prefix frontend",
+  "start": "echo 'dot-platform environment ready'",
+  "ports": [
+    { "name": "api", "port": 8000 },
+    { "name": "vite", "port": 5173 }
+  ],
+  "terminals": [
+    {
+      "name": "backend",
+      "command": "cd backend && .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
+      "description": "FastAPI + SQLite. Health: http://localhost:8000/api/health"
+    },
+    {
+      "name": "frontend",
+      "command": "npm run dev --prefix frontend -- --host 0.0.0.0 --port 5173",
+      "description": "Vite dev server. UI: http://localhost:5173 (proxies /api to :8000)"
+    }
+  ]
+}

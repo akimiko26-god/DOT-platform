@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 .env
 .venv/
+backend/.venv/
 pgdata/
 *.log
 .DS_Store
