@@ -142,6 +142,13 @@ export default function CatalogManage() {
 
   useEffect(() => { if (isAdmin) api('/admin/companies').then(setAdminCompanies) }, [isAdmin])
   useEffect(load, [load])
+  useEffect(() => {
+    setActiveFolder(null)
+    setSelectedIds([])
+    setShowForm(false)
+    setEditing(null)
+    setOpenFolders({ none: true })
+  }, [effectiveCompanyId])
   useEffect(() => { if (view === 'list') setActiveFolder(null) }, [view])
   useEffect(() => { setSelectedIds([]) }, [itemStatus, activeFolder])
 

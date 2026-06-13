@@ -120,7 +120,7 @@ export default function Customers() {
 
   const refreshAi = async () => {
 
-    if (!selected || !editForm) return
+    if (!selected || !editForm || aiLoading || aiAskLoading) return
 
     setAiLoading(true)
 
@@ -162,7 +162,7 @@ export default function Customers() {
 
   const askAi = async () => {
 
-    if (!selected || !aiQuestion.trim()) return
+    if (!selected || !aiQuestion.trim() || aiLoading || aiAskLoading) return
 
     setAiAskLoading(true)
 
@@ -338,19 +338,39 @@ export default function Customers() {
 
 
 
-            <div className="ai-insight-box">
+            <div className={`ai-insight-box${aiLoading || aiAskLoading ? ' is-loading' : ''}`}>
 
               <div className="flex-between">
 
                 <h4>AI-бриф для менеджера</h4>
 
-                <button type="button" className="btn btn-outline" onClick={refreshAi} disabled={aiLoading}>
+                <button type="button" className="btn btn-outline" onClick={refreshAi} disabled={aiLoading || aiAskLoading}>
 
                   {aiLoading ? 'Анализ…' : 'Обновить с ИИ'}
 
                 </button>
 
               </div>
+
+              {(aiLoading || aiAskLoading) && (
+
+                <div className="ai-loading-banner" role="status" aria-live="polite">
+
+                  <span className="ai-spinner" aria-hidden="true" />
+
+                  <span>
+
+                    {aiLoading
+
+                      ? 'ИИ формирует бриф по клиенту. Подождите ответ — обычно 10–30 секунд. Не нажимайте «Обновить с ИИ» повторно.'
+
+                      : 'ИИ готовит ответ на ваш вопрос. Подождите — не отправляйте вопрос повторно.'}
+
+                  </span>
+
+                </div>
+
+              )}
 
               <p className="emp-meta" style={{ marginTop: '0.35rem' }}>
 
@@ -420,13 +440,15 @@ export default function Customers() {
 
                     onChange={(e) => setAiQuestion(e.target.value)}
 
-                    onKeyDown={(e) => e.key === 'Enter' && askAi()}
+                    onKeyDown={(e) => e.key === 'Enter' && !aiAskLoading && !aiLoading && askAi()}
+
+                    disabled={aiAskLoading || aiLoading}
 
                   />
 
-                  <button type="button" className="btn btn-outline" onClick={askAi} disabled={aiAskLoading}>
+                  <button type="button" className="btn btn-outline" onClick={askAi} disabled={aiAskLoading || aiLoading}>
 
-                    {aiAskLoading ? '…' : 'Спросить'}
+                    {aiAskLoading ? 'Ждём…' : 'Спросить'}
 
                   </button>
 

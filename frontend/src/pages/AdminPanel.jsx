@@ -203,15 +203,17 @@ export default function AdminPanel() {
                     <td><OnlineDot online={u.is_online} /></td>
                     <td>{u.id}</td>
                     <td>{u.full_name}{u.id === user?.id ? ' (вы)' : ''}</td>
-                    <td className="cell-break">{u.email}</td>
+                    <td className="cell-email">{u.email}</td>
                     <td className="cell-break">{u.company_names?.join(', ') || '—'}</td>
                     <td>{u.is_admin ? 'Да' : 'Нет'}</td>
                     <td>{u.is_active ? 'Да' : 'Нет'}</td>
                     <td className="cell-nowrap">{fmtSeen(u.last_seen_at)}</td>
-                    <td className="table-actions">
-                      <button type="button" className="btn btn-outline btn-xs" onClick={() => setEditUser({ ...u })}>Изменить</button>
-                      <button type="button" className="btn btn-outline btn-xs" onClick={() => toggleUser(u, 'is_admin')}>{u.is_admin ? '−Админ' : '+Админ'}</button>
-                      <button type="button" className="btn btn-outline btn-xs" onClick={() => toggleUser(u, 'is_active')}>{u.is_active ? 'Блок' : 'Разблок'}</button>
+                    <td className="col-actions">
+                      <div className="table-actions">
+                        <button type="button" className="btn btn-outline btn-xs" onClick={() => setEditUser({ ...u })}>Изменить</button>
+                        <button type="button" className="btn btn-outline btn-xs" onClick={() => toggleUser(u, 'is_admin')}>{u.is_admin ? '−Админ' : '+Админ'}</button>
+                        <button type="button" className="btn btn-outline btn-xs" onClick={() => toggleUser(u, 'is_active')}>{u.is_active ? 'Блок' : 'Разблок'}</button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -262,29 +262,29 @@ export default function QrTools() {
                     </div>
                   </div>
                 ))}
-              </div>
-              <div className="field">
-                <label>Иконка на QR</label>
-                <select className="input-unified" value={custom.card_icon} onChange={(e) => setCustom((c) => ({ ...c, card_icon: e.target.value }))}>
-                  <option value="none">Без иконки</option>
-                  <option value="dots">Точки</option>
-                  <option value="phone">Телефон</option>
-                  <option value="smartphone">Смартфон</option>
-                  <option value="pen">Ручка / документ</option>
-                </select>
-              </div>
-              <div className="field">
-                <label>Стиль рамки</label>
-                <select className="input-unified" value={custom.frame_style} onChange={(e) => setCustom((c) => ({ ...c, frame_style: e.target.value }))}>
-                  <option value="rounded">Скруглённая</option>
-                  <option value="sharp">Прямая</option>
-                  <option value="dashed">Пунктир</option>
-                  <option value="none">Без рамки</option>
-                </select>
-              </div>
-              <div className="qr-control-group">
-                <label>Размер QR ({Math.round(custom.qr_scale * 100)}%)</label>
-                <input type="range" className="qr-range" min="0.32" max="0.65" step="0.01" value={custom.qr_scale} onChange={(e) => setCustom((c) => ({ ...c, qr_scale: Number(e.target.value) }))} />
+                <div className="qr-control-group">
+                  <label>Иконка на QR</label>
+                  <select className="input-unified" value={custom.card_icon} onChange={(e) => setCustom((c) => ({ ...c, card_icon: e.target.value }))}>
+                    <option value="none">Без иконки</option>
+                    <option value="dots">Точки</option>
+                    <option value="phone">Телефон</option>
+                    <option value="smartphone">Смартфон</option>
+                    <option value="pen">Ручка / документ</option>
+                  </select>
+                </div>
+                <div className="qr-control-group">
+                  <label>Стиль рамки</label>
+                  <select className="input-unified" value={custom.frame_style} onChange={(e) => setCustom((c) => ({ ...c, frame_style: e.target.value }))}>
+                    <option value="rounded">Скруглённая</option>
+                    <option value="sharp">Прямая</option>
+                    <option value="dashed">Пунктир</option>
+                    <option value="none">Без рамки</option>
+                  </select>
+                </div>
+                <div className="qr-control-group">
+                  <label>Размер QR ({Math.round(custom.qr_scale * 100)}%)</label>
+                  <input type="range" className="qr-range" min="0.32" max="0.65" step="0.01" value={custom.qr_scale} onChange={(e) => setCustom((c) => ({ ...c, qr_scale: Number(e.target.value) }))} />
+                </div>
               </div>
               <div className="field">
                 <label>Сохранить шаблон</label>

@@ -583,12 +583,12 @@ textarea {
   gap: 1rem;
   align-items: start;
 }
-.qr-builder-controls { grid-column: span 12; }
+.qr-builder-controls { grid-column: span 12; min-width: 0; }
 @media (min-width: 900px) {
   .qr-builder-controls { grid-column: span 5; }
-  .qr-builder-preview { grid-column: span 7; }
+  .qr-builder-preview { grid-column: span 7; position: sticky; top: 5.5rem; }
 }
-.qr-builder-preview { grid-column: span 12; }
+.qr-builder-preview { grid-column: span 12; min-width: 0; }
 .qr-grid-canvas {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
@@ -692,15 +692,22 @@ textarea {
   -webkit-overflow-scrolling: touch;
   padding: 0;
 }
-.data-table--wide { min-width: 720px; }
+.data-table--wide { min-width: 920px; }
+.col-actions {
+  width: 1%;
+  vertical-align: middle;
+  padding-left: 0.5rem;
+}
 .table-actions {
   display: flex;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-  min-width: 140px;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 108px;
 }
-.btn-xs { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
-.cell-break { word-break: break-word; max-width: 200px; }
+.table-actions .btn-xs { width: 100%; justify-content: center; }
+.btn-xs { padding: 0.35rem 0.6rem; font-size: 0.8rem; white-space: nowrap; }
+.cell-break { word-break: break-word; max-width: 240px; min-width: 120px; }
+.cell-email { white-space: nowrap; min-width: 170px; font-size: 0.85rem; }
 .cell-nowrap { white-space: nowrap; font-size: 0.85rem; }
 
 .flex-between {
@@ -1035,10 +1042,41 @@ textarea {
 
 .qr-custom-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.75rem;
   margin-bottom: 0.75rem;
 }
+@media (max-width: 1100px) {
+  .qr-custom-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .qr-custom-grid { grid-template-columns: 1fr; }
+}
+.ai-loading-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0 0;
+  background: var(--surface);
+  border: 1px dashed var(--accent);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.ai-spinner {
+  width: 18px;
+  height: 18px;
+  margin-top: 0.1rem;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: ai-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes ai-spin { to { transform: rotate(360deg); } }
+.ai-insight-box.is-loading { opacity: 0.85; }
 .filter-bar { margin-bottom: 1rem; }
 .filter-bar .field { margin-bottom: 0.75rem; }
 
