@@ -1,4 +1,5 @@
-"""Создание системного супер-админа при старте."""
+"""Создание системного супер-админа и демо-данных при старте."""
+
 from app.auth import hash_password
 from app.config import settings
 from app.models import User
@@ -27,3 +28,9 @@ def ensure_superadmin(db) -> None:
         )
     )
     db.commit()
+
+
+def ensure_demo_data(db) -> None:
+    from app.seed_demo import seed_demo_data
+
+    seed_demo_data(db)

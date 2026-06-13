@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
+import FormattedText from '../components/FormattedText'
 
 export default function PublicCatalog() {
   const { slug } = useParams()
@@ -22,8 +23,8 @@ export default function PublicCatalog() {
             )}
             <span style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>{item.category}</span>
             <h3 style={{ margin: '0.35rem 0' }}>{item.title}</h3>
-            <p style={{ fontWeight: 700 }}>{item.price.toLocaleString('ru')} ₸</p>
-            <p style={{ color: 'var(--muted)', marginTop: '0.5rem' }}>{item.description}</p>
+            <p className="catalog-price">{item.price.toLocaleString('ru')} ₸</p>
+            <FormattedText text={item.description} className="text-muted catalog-desc" />
           </article>
         ))}
       </div>

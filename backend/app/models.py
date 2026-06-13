@@ -111,6 +111,7 @@ class Company(Base):
     director_name = Column(String(255), default="")
     bin_iin = Column(String(32), default="")
     legal_address = Column(String(512), default="")
+    logo_url = Column(String(512), default="")
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     is_active = Column(Boolean, default=True)
     module_leads = Column(Boolean, default=True)
@@ -130,6 +131,61 @@ class Company(Base):
     page_views = relationship("PageView", back_populates="company", cascade="all, delete-orphan")
     qr_templates = relationship("QrSavedTemplate", back_populates="company", cascade="all, delete-orphan")
     qr_links = relationship("QrCustomLink", back_populates="company", cascade="all, delete-orphan")
+    slides = relationship("CompanySlide", back_populates="company", cascade="all, delete-orphan", order_by="CompanySlide.sort_order")
+
+
+class CompanySlide(Base):
+    __tablename__ = "company_slides"
+
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    image_url = Column(String(512), nullable=False)
+    caption = Column(String(255), default="")
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    company = relationship("Company", back_populates="slides")
+
+
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token_hash = Column(String(64), index=True, default="")
+    ip_address = Column(String(64), default="")
+    user_agent = Column(String(512), default="")
+    started_at = Column(DateTime, default=datetime.utcnow)
+    last_seen_at = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=True)
+
+    user = relationship("User")
+
+
+class CustomerInsightLog(Base):
+    __tablename__ = "customer_insight_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
+    insight_text = Column(Text, nullable=False)
+    source = Column(String(32), default="heuristic")
+    meta_json = Column(Text, default="{}")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    customer = relationship("Customer")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    action = Column(String(64), nullable=False)
+    entity_type = Column(String(64), default="")
+    entity_id = Column(Integer, nullable=True)
+    details = Column(Text, default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 
 
 class QrCustomLink(Base):

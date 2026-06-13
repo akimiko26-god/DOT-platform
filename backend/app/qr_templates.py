@@ -33,10 +33,20 @@ def _hex(c: str, default: str) -> str:
 
 
 def _font(size: int):
-    try:
-        return ImageFont.truetype("arial.ttf", size)
-    except OSError:
-        return ImageFont.load_default()
+    paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "C:/Windows/Fonts/arialbd.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+        "arialbd.ttf",
+        "arial.ttf",
+    ]
+    for p in paths:
+        try:
+            return ImageFont.truetype(p, size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
 
 
 def _draw_gradient_bg(draw: ImageDraw.ImageDraw, w: int, h: int, c1: str, c2: str):
@@ -131,18 +141,18 @@ def render_qr_card(
 
     header_h = 88
     draw.rounded_rectangle((20, 20, w - 20, header_h), radius=20, fill=accent)
-    draw.text((36, 36), "./dot", fill="#ffffff", font=_font(24))
-    draw.text((36, 64), "SCAN ME", fill="#ffffff", font=_font(11))
+    draw.text((36, 32), "./dot", fill="#ffffff", font=_font(28))
+    draw.text((36, 62), "SCAN ME", fill="#ffffff", font=_font(15))
 
     y_text = header_h + 22
     title = (company_name or "Компания")[:36]
-    draw.text((36, y_text), title, fill=fg, font=_font(20))
-    y_text += 30
+    draw.text((36, y_text), title, fill=fg, font=_font(26))
+    y_text += 36
     if caption:
         cap = caption[:56]
-        draw.rounded_rectangle((28, y_text - 4, w - 28, y_text + 26), radius=10, fill=accent + "33")
-        draw.text((40, y_text), cap, fill=accent, font=_font(16))
-        y_text += 38
+        draw.rounded_rectangle((28, y_text - 4, w - 28, y_text + 30), radius=10, fill=accent + "33")
+        draw.text((40, y_text), cap, fill=accent, font=_font(20))
+        y_text += 42
 
     footer_h = 88 if show_badge else 24
     qr_area_top = y_text + 14
@@ -167,8 +177,8 @@ def render_qr_card(
     if show_badge:
         badge = "Откройте камеру →"
         draw.rounded_rectangle((60, h - 88, w - 60, h - 38), radius=16, fill=accent)
-        tw = draw.textlength(badge, font=_font(16))
-        draw.text(((w - tw) / 2, h - 72), badge, fill="#ffffff", font=_font(16))
+        tw = draw.textlength(badge, font=_font(20))
+        draw.text(((w - tw) / 2, h - 74), badge, fill="#ffffff", font=_font(20))
 
     buf = io.BytesIO()
     img.save(buf, format="PNG", quality=95)

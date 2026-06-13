@@ -1,7 +1,7 @@
 import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
@@ -14,6 +14,7 @@ from app.database import get_db
 from app.email_service import send_reset_email
 from app.models import Company, CompanyMember, PasswordResetToken, User
 from app.permissions import is_owner, user_company_ids
+from app.sessions import audit, record_session, touch_session
 from app.schemas import (
     ForgotPasswordRequest,
     ResetPasswordRequest,
@@ -72,21 +73,35 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(
+    request: Request,
+    form: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
     user = db.query(User).filter(User.email == form.username).first()
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
     if not verify_password(form.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
     touch_last_seen(user)
-    db.commit()
     token = create_access_token({"sub": str(user.id)})
+    record_session(db, user.id, token, request)
+    audit(db, user.id, "login", "user", user.id)
+    db.commit()
     return Token(access_token=token)
 
 
 @router.post("/ping")
-def ping(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def ping(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     touch_last_seen(user)
+    auth = request.headers.get("authorization", "")
+    token = auth.replace("Bearer ", "") if auth.startswith("Bearer ") else None
+    if token:
+        touch_session(db, user.id, token)
     db.commit()
     return {"ok": True}
 

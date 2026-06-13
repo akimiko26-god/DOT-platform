@@ -65,6 +65,7 @@ class CompanyUpdate(BaseModel):
     instagram: Optional[str] = None
     work_schedule: Optional[str] = None
     activities: Optional[str] = None
+    logo_url: Optional[str] = None
     module_leads: Optional[bool] = None
     module_crm: Optional[bool] = None
     module_catalog: Optional[bool] = None
@@ -88,6 +89,7 @@ class CompanyOut(BaseModel):
     instagram: str
     work_schedule: str
     activities: str
+    logo_url: str = ""
     module_leads: bool
     module_crm: bool
     module_catalog: bool
@@ -96,6 +98,25 @@ class CompanyOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CompanySlideOut(BaseModel):
+    id: int
+    image_url: str
+    caption: str = ""
+    sort_order: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class CompanySlideCreate(BaseModel):
+    image_url: str
+    caption: str = ""
+
+
+class PublicCompanyOut(CompanyOut):
+    slides: list[CompanySlideOut] = []
 
 
 class LeadCreate(BaseModel):

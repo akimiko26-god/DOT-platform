@@ -68,6 +68,19 @@ export async function uploadAvatar(file) {
   return res.json()
 }
 
+export async function uploadLogo(companyId, file) {
+  const token = getToken()
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch(`${API}/companies/${companyId}/logo`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  })
+  if (!res.ok) throw new Error('Не удалось загрузить логотип')
+  return res.json()
+}
+
 export async function uploadImage(companyId, file) {
   const token = getToken()
   const form = new FormData()

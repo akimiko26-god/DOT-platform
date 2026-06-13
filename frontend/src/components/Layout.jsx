@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import ProfileMenu from './ProfileMenu'
+import ThemeToggle from './ThemeToggle'
 import { usePresence } from '../hooks/usePresence'
 import { useUser } from '../hooks/useUser'
 
@@ -78,6 +79,7 @@ export default function Layout() {
           </nav>
 
           <div className="header-profile">
+            <ThemeToggle />
             <ProfileMenu />
           </div>
         </div>

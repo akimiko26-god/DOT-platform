@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import CatalogItem, Company, Customer, Lead, LeadSource, PageView
+from app.models import CatalogItem, Company, CompanySlide, Customer, Lead, LeadSource, PageView
 from app.routers.catalog import _item_out
-from app.schemas import CatalogItemOut, CompanyOut, LeadCreate, LeadOut, MessengerLinkOut
+from app.schemas import CatalogItemOut, LeadCreate, LeadOut, MessengerLinkOut, PublicCompanyOut
 
 router = APIRouter(prefix="/api/public", tags=["public"])
 
@@ -23,11 +23,41 @@ def track_view(company_id: int, page: str, db: Session):
     db.commit()
 
 
-@router.get("/companies/{slug}", response_model=CompanyOut)
+@router.get("/companies/{slug}", response_model=PublicCompanyOut)
 def public_company(slug: str, db: Session = Depends(get_db)):
     company = get_company_by_slug(slug, db)
     track_view(company.id, "profile", db)
-    return company
+    slides = (
+        db.query(CompanySlide)
+        .filter(CompanySlide.company_id == company.id)
+        .order_by(CompanySlide.sort_order, CompanySlide.id)
+        .all()
+    )
+    return PublicCompanyOut(
+        id=company.id,
+        slug=company.slug,
+        name=company.name,
+        description=company.description or "",
+        director_name=company.director_name or "",
+        bin_iin=company.bin_iin or "",
+        legal_address=company.legal_address or "",
+        phone=company.phone or "",
+        email=company.email or "",
+        address=company.address or "",
+        website=company.website or "",
+        whatsapp=company.whatsapp or "",
+        telegram=company.telegram or "",
+        instagram=company.instagram or "",
+        work_schedule=company.work_schedule or "",
+        activities=company.activities or "",
+        logo_url=company.logo_url or "",
+        module_leads=company.module_leads,
+        module_crm=company.module_crm,
+        module_catalog=company.module_catalog,
+        module_qr=company.module_qr,
+        is_active=company.is_active,
+        slides=slides,
+    )
 
 
 @router.get("/companies/{slug}/catalog", response_model=list[CatalogItemOut])

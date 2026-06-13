@@ -278,7 +278,10 @@ export default function Customers() {
 
               </div>
 
-              <p className="emp-meta" style={{ marginTop: '0.35rem' }}>Анализ по заявкам и заметкам клиента. Обновляйте после новых обращений.</p>
+              <p className="emp-meta" style={{ marginTop: '0.35rem' }}>
+                Анализ по заявкам и заметкам.
+                {detail.insight_meta?.source === 'gemini' ? ' Модель: Gemini (бесплатный API).' : ' Локальный анализ (добавьте GEMINI_API_KEY для ИИ).'}
+              </p>
 
               <pre className="ai-insight-text">{detail.ai_insight || 'Нажмите «Обновить с ИИ» для генерации.'}</pre>
 

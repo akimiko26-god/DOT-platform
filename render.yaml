@@ -17,3 +17,7 @@ services:
         value: sqlite:////app/backend/data/dot.db
       - key: PYTHONUNBUFFERED
         value: "1"
+      - key: SEED_DEMO
+        value: "true"
+      - key: GEMINI_API_KEY
+        sync: false

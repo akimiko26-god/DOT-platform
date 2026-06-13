@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     mail_from: str = "noreply@dot.kz"
     reset_token_expire_hours: int = 24
     admin_email: str = ""
+    gemini_api_key: str = ""
+    seed_demo: bool = False
 
     class Config:
         env_file = ".env"

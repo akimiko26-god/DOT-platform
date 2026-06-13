@@ -30,6 +30,8 @@ def run_migrations():
                 conn.execute(text("ALTER TABLE companies ADD COLUMN bin_iin VARCHAR(32) DEFAULT ''"))
             if "legal_address" not in cols:
                 conn.execute(text("ALTER TABLE companies ADD COLUMN legal_address VARCHAR(512) DEFAULT ''"))
+            if "logo_url" not in cols:
+                conn.execute(text("ALTER TABLE companies ADD COLUMN logo_url VARCHAR(512) DEFAULT ''"))
 
         if "lead_comments" in insp.get_table_names():
             cols = {c["name"] for c in insp.get_columns("lead_comments")}
@@ -64,7 +66,7 @@ def run_migrations():
         from app.database import Base
         from app import models  # noqa: F401
 
-        for tbl in ("qr_saved_templates", "qr_custom_links"):
+        for tbl in ("qr_saved_templates", "qr_custom_links", "company_slides", "user_sessions", "customer_insight_logs", "audit_logs"):
             if tbl not in insp.get_table_names():
                 Base.metadata.create_all(bind=engine, tables=[Base.metadata.tables[tbl]])
 

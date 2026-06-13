@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
+import json
 from sqlalchemy.orm import Session
 
 from app.ai_insights import generate_customer_insight
 from app.auth import get_company_for_user, get_current_user
 from app.database import get_db
-from app.models import Customer, Lead, User
+from app.models import Customer, CustomerInsightLog, Lead, LeadComment, User
 from app.schemas import CustomerCreate, CustomerDetailOut, CustomerOut, CustomerUpdate
 
 router = APIRouter(prefix="/api/companies/{company_id}/customers", tags=["customers"])
@@ -52,6 +53,10 @@ def get_customer(
         .order_by(Lead.created_at.desc())
         .all()
     )
+    for l in leads:
+        l.comments = (
+            db.query(LeadComment).filter(LeadComment.lead_id == l.id).order_by(LeadComment.created_at).all()
+        )
     insight_data = generate_customer_insight(customer, leads)
     if not customer.ai_insight:
         customer.ai_insight = insight_data["insight"]
@@ -85,9 +90,31 @@ def refresh_insight(
     ).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Клиент не найден")
-    leads = db.query(Lead).filter(Lead.customer_id == customer.id).all()
+    leads = (
+        db.query(Lead)
+        .filter(Lead.company_id == company_id)
+        .filter(
+            (Lead.customer_id == customer.id)
+            | (Lead.client_phone == customer.phone)
+            | (Lead.client_email == customer.email)
+        )
+        .order_by(Lead.created_at.desc())
+        .all()
+    )
+    for l in leads:
+        l.comments = (
+            db.query(LeadComment).filter(LeadComment.lead_id == l.id).order_by(LeadComment.created_at).all()
+        )
     data = generate_customer_insight(customer, leads)
     customer.ai_insight = data["insight"]
+    db.add(
+        CustomerInsightLog(
+            customer_id=customer.id,
+            insight_text=data["insight"],
+            source=data.get("source", "heuristic"),
+            meta_json=json.dumps({k: v for k, v in data.items() if k != "insight"}, default=str),
+        )
+    )
     db.commit()
     return data
 
