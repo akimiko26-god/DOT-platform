@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 
 import { api } from '../api/client'
 
+import FormattedText from '../components/FormattedText'
+
 import Modal from '../components/Modal'
 
 import PageShell from '../components/PageShell'
@@ -35,6 +37,8 @@ export default function Customers() {
   const [editForm, setEditForm] = useState(null)
 
   const [loadingDetail, setLoadingDetail] = useState(false)
+
+  const [aiLoading, setAiLoading] = useState(false)
 
 
 
@@ -110,9 +114,41 @@ export default function Customers() {
 
   const refreshAi = async () => {
 
-    const data = await api(`/companies/${companyId}/customers/${selected.id}/refresh-insight`, { method: 'POST' })
+    if (!selected || !editForm) return
 
-    setDetail((d) => ({ ...d, ai_insight: data.insight, insight_meta: data }))
+    setAiLoading(true)
+
+    try {
+
+      const data = await api(`/companies/${companyId}/customers/${selected.id}/refresh-insight`, {
+
+        method: 'POST',
+
+        body: JSON.stringify(editForm),
+
+      })
+
+      setDetail((d) => ({
+
+        ...d,
+
+        ...editForm,
+
+        ai_insight: data.insight,
+
+        insight_meta: data,
+
+      }))
+
+      setSelected((s) => ({ ...s, ...editForm }))
+
+      load()
+
+    } finally {
+
+      setAiLoading(false)
+
+    }
 
   }
 
@@ -272,22 +308,65 @@ export default function Customers() {
 
               <div className="flex-between">
 
-                <h4>Индивидуальная AI-подсказка</h4>
+                <h4>AI-бриф для менеджера</h4>
 
-                <button type="button" className="btn btn-outline" onClick={refreshAi}>Обновить с ИИ</button>
+                <button type="button" className="btn btn-outline" onClick={refreshAi} disabled={aiLoading}>
+
+                  {aiLoading ? 'Анализ…' : 'Обновить с ИИ'}
+
+                </button>
 
               </div>
 
               <p className="emp-meta" style={{ marginTop: '0.35rem' }}>
-                Анализ по заявкам и заметкам.
-                {detail.insight_meta?.source === 'gemini' ? ' Модель: Gemini (бесплатный API).' : ' Локальный анализ (добавьте GEMINI_API_KEY для ИИ).'}
+
+                Учитывает текущую карточку, заметки и всю историю обращений.
+
+                {detail.insight_meta?.source === 'gemini'
+
+                  ? ` Модель: ${detail.insight_meta.gemini_model || 'Gemini'}.`
+
+                  : detail.insight_meta?.gemini_error === 'quota'
+
+                    ? ' Лимит Gemini — локальный анализ.'
+
+                    : ' Локальный анализ.'}
+
+                {detail.insight_meta?.generated_at && (
+
+                  <> Обновлено: {new Date(detail.insight_meta.generated_at).toLocaleString('ru')}.</>
+
+                )}
+
               </p>
 
-              <pre className="ai-insight-text">{detail.ai_insight || 'Нажмите «Обновить с ИИ» для генерации.'}</pre>
+              {detail.ai_insight ? (
 
-              {detail.insight_meta?.pains?.length > 0 && (
+                <FormattedText text={detail.ai_insight} className="ai-insight-text" tag="div" />
 
-                <p><strong>Боли:</strong> {detail.insight_meta.pains.join(', ')}</p>
+              ) : (
+
+                <p className="ai-insight-text text-muted">Нажмите «Обновить с ИИ» — будет составлена предыстория, портрет клиента, рекомендации и риски.</p>
+
+              )}
+
+              {detail.insight_meta?.risks?.length > 0 && (
+
+                <div className="ai-meta-block">
+
+                  <strong>Риски:</strong> {detail.insight_meta.risks.join(' · ')}
+
+                </div>
+
+              )}
+
+              {detail.insight_meta?.touch_points?.length > 0 && (
+
+                <div className="ai-meta-block">
+
+                  <strong>Точки соприкосновения:</strong> {detail.insight_meta.touch_points.join(' · ')}
+
+                </div>
 
               )}
 
@@ -310,6 +389,16 @@ export default function Customers() {
                 </div>
 
                 <p style={{ marginTop: '0.35rem' }}>{l.message}</p>
+
+                {l.comments?.length > 0 && l.comments.map((c) => (
+
+                  <p key={c.id} className="emp-meta" style={{ marginTop: '0.25rem' }}>
+
+                    💬 {c.author_name}: {c.text}
+
+                  </p>
+
+                ))}
 
                 <p className="emp-meta">Источник: {l.source}</p>
 

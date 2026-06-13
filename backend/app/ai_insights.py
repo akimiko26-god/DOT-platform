@@ -1,6 +1,5 @@
-"""AI-анализ клиентов: Gemini (бесплатный ключ) + улучшенная эвристика без ключа."""
+"""AI-анализ клиентов: Gemini + улучшенная эвристика без ключа."""
 
-import json
 import re
 from collections import Counter
 from datetime import datetime
@@ -22,7 +21,38 @@ PAIN_WORDS = {
     "возврат": "возможен спор по оплате или возврату",
     "долго": "ожидает ускорения процесса",
     "не отвеч": "риск потери клиента из-за задержки",
+    "разочар": "снижение лояльности",
+    "плох": "негативный опыт в прошлом",
+    "злой": "эскалация конфликта",
 }
+
+STATUS_RU = {
+    "new": "Новая",
+    "in_progress": "В работе",
+    "waiting": "Ожидает ответа",
+    "done": "Выполнена",
+    "cancelled": "Отменена",
+}
+
+SOURCE_RU = {
+    "website": "Сайт",
+    "landing": "Лендинг",
+    "qr": "QR-код",
+    "form": "Форма",
+    "whatsapp": "WhatsApp",
+    "telegram": "Telegram",
+    "other": "Другое",
+}
+
+SECTION_HEADERS = [
+    "Предыстория",
+    "Портрет клиента",
+    "Настрой и характер",
+    "Рекомендации менеджеру",
+    "Риски",
+    "Точки соприкосновения",
+    "Следующий шаг",
+]
 
 
 def _lead_status(l) -> str:
@@ -33,6 +63,57 @@ def _lead_source(l) -> str:
     return l.source.value if hasattr(l.source, "value") else str(l.source)
 
 
+def _fmt_dt(dt) -> str:
+    if not dt:
+        return "—"
+    return dt.strftime("%d.%m.%Y %H:%M")
+
+
+def _format_lead_history(leads: list) -> str:
+    if not leads:
+        return "Обращений пока нет."
+    lines = []
+    for l in leads[:20]:
+        status = STATUS_RU.get(_lead_status(l), _lead_status(l))
+        source = SOURCE_RU.get(_lead_source(l), _lead_source(l))
+        lines.append(
+            f"• [{_fmt_dt(l.created_at)}] {status} / {source}\n"
+            f"  Сообщение: {l.message or '(без текста)'}"
+        )
+        for c in getattr(l, "comments", []) or []:
+            author = c.author_name or "Менеджер"
+            job = f", {c.author_job_title}" if getattr(c, "author_job_title", "") else ""
+            lines.append(f"  ↳ {_fmt_dt(c.created_at)} {author}{job}: {c.text}")
+    return "\n".join(lines)
+
+
+def _format_customer_card(customer) -> str:
+    return "\n".join(
+        [
+            f"Имя: {customer.name}",
+            f"Телефон: {customer.phone or '—'}",
+            f"Email: {customer.email or '—'}",
+            f"VIP: {'да' if customer.is_vip else 'нет'}",
+            f"Количество обращений: {customer.visit_count}",
+            f"Клиент с: {_fmt_dt(customer.created_at)}",
+            f"Последнее изменение карточки: {_fmt_dt(customer.updated_at)}",
+            f"Заметки менеджера:\n{customer.notes or '—'}",
+        ]
+    )
+
+
+def _parse_sections(text: str) -> dict:
+    sections = {}
+    pattern = r"^##\s*(.+?)\s*$"
+    parts = re.split(pattern, text, flags=re.MULTILINE)
+    if len(parts) > 1:
+        for i in range(1, len(parts), 2):
+            title = parts[i].strip()
+            body = parts[i + 1].strip() if i + 1 < len(parts) else ""
+            sections[title] = body
+    return sections
+
+
 def _collect_context(customer, leads: list) -> dict:
     messages = []
     comments = []
@@ -41,31 +122,63 @@ def _collect_context(customer, leads: list) -> dict:
             messages.append(l.message)
         for c in getattr(l, "comments", []) or []:
             comments.append(c.text or "")
-    combined = " ".join(messages + comments).lower()
+    combined = " ".join(messages + comments + [customer.notes or ""]).lower()
     pains = []
     for word, label in PAIN_WORDS.items():
         if word in combined:
             pains.append(label)
-    if not pains and messages:
-        pains.append("стандартный запрос без явных негативных сигналов")
+    if not pains and (messages or customer.notes):
+        pains.append("явных негативных сигналов не выявлено")
 
     sources = Counter(_lead_source(l) for l in leads)
     statuses = Counter(_lead_status(l) for l in leads)
-    top_source = sources.most_common(1)[0][0] if sources else "неизвестно"
-    repeat = customer.visit_count > 1
-    tone = "теплый и персональный" if repeat else "информативный и убедительный"
+    top_source = SOURCE_RU.get(sources.most_common(1)[0][0], "неизвестно") if sources else "неизвестно"
+    repeat = customer.visit_count > 1 or len(leads) > 1
+    active = statuses.get("waiting", 0) + statuses.get("in_progress", 0) + statuses.get("new", 0)
+
+    tone = "спокойный и уверенный"
+    if any(w in combined for w in ("жалоб", "злой", "разочар", "плох", "возврат")):
+        tone = "эмпатичный, без оправданий — сначала признать проблему"
+    elif repeat or customer.is_vip:
+        tone = "теплый, персональный, с уважением к истории"
+    elif "срочно" in combined:
+        tone = "оперативный, конкретный, с чёткими сроками"
 
     offer = []
     if "цен" in combined or "дорого" in combined:
         offer.append("предложить пакет со скидкой или рассрочку")
     if repeat:
-        offer.append("напомнить про прошлый успешный опыт и бонусы лояльности")
+        offer.append("сослаться на прошлый успешный опыт и бонусы лояльности")
     if "срочно" in combined:
         offer.append("зафиксировать SLA ответа и приоритетную линию")
     if customer.is_vip:
         offer.append("персональный менеджер и приоритетное обслуживание")
+    if active:
+        offer.append("закрыть открытые заявки до новых предложений")
     if not offer:
-        offer.append("уточнить потребность и предложить 2–3 релевантных варианта из каталога")
+        offer.append("уточнить потребность и предложить 2–3 релевантных варианта")
+
+    risks = []
+    if statuses.get("cancelled", 0):
+        risks.append("есть отменённые заявки — возможна потеря интереса")
+    if statuses.get("waiting", 0):
+        risks.append("клиент ждёт ответа — риск ухода к конкуренту")
+    if any(w in combined for w in ("жалоб", "брак", "возврат")):
+        risks.append("вероятна эскалация — нужна эскалация старшему менеджеру")
+    if not risks:
+        risks.append("критических рисков не видно, но важно не затягивать ответ")
+
+    touch_points = []
+    if customer.phone:
+        touch_points.append(f"звонок/WhatsApp: {customer.phone}")
+    if customer.email:
+        touch_points.append(f"email: {customer.email}")
+    if messages:
+        touch_points.append("вернуться к формулировкам из последнего обращения")
+    if customer.notes:
+        touch_points.append("опереться на заметки менеджера в карточке")
+    if not touch_points:
+        touch_points.append("уточнить удобный канал связи при первом контакте")
 
     return {
         "messages": messages,
@@ -77,106 +190,194 @@ def _collect_context(customer, leads: list) -> dict:
         "repeat": repeat,
         "tone": tone,
         "offer": offer,
+        "risks": risks,
+        "touch_points": touch_points,
         "leads_count": len(leads),
+        "active_leads": active,
     }
 
 
-def _heuristic_insight(customer, ctx: dict) -> str:
-    summary = (
-        f"Клиент «{customer.name}» — {'повторное' if ctx['repeat'] else 'первое'} обращение "
-        f"({customer.visit_count} визитов). Основной канал: {ctx['top_source']}."
+def _heuristic_insight(customer, leads: list, ctx: dict) -> str:
+    history_brief = (
+        f"{'Повторный' if ctx['repeat'] else 'Новый'} клиент, {customer.visit_count} обращений. "
+        f"Основной канал: {ctx['top_source']}. "
+        f"Активных заявок: {ctx['active_leads']}."
     )
     if customer.is_vip:
-        summary += " Статус: VIP."
-    pain_block = "Возможные боли: " + (", ".join(ctx["pains"]) if ctx["pains"] else "не выявлены явно")
-    approach = (
-        f"Рекомендуемый тон: {ctx['tone']}. "
-        f"С какой стороны зайти: начните с уточнения цели, затем {ctx['offer'][0]}."
-    )
-    extras = []
-    if customer.notes:
-        extras.append(f"Заметки менеджера:\n{customer.notes[:400]}")
-    waiting = ctx["statuses"].get("waiting", 0) + ctx["statuses"].get("in_progress", 0)
-    if waiting:
-        extras.append(f"Активных заявок в работе: {waiting} — приоритет на закрытие диалога.")
-    if ctx["comments"]:
-        extras.append(f"Комментариев менеджеров: {len(ctx['comments'])}")
+        history_brief += " Статус VIP — повышенное внимание."
 
-    return "\n\n".join(
-        [
-            "🤖 AI-подсказка (локальный анализ)",
-            summary,
-            pain_block,
-            approach,
-            "Что предложить: " + "; ".join(ctx["offer"]),
-            *extras,
-        ]
+    portrait = (
+        f"По истории: {', '.join(ctx['pains'][:3]) if ctx['pains'] else 'стандартный запрос'}. "
+        f"Комментариев менеджеров: {len(ctx['comments'])}."
     )
 
+    sections = {
+        "Предыстория": history_brief,
+        "Портрет клиента": portrait,
+        "Настрой и характер": f"Рекомендуемый тон: {ctx['tone']}.",
+        "Рекомендации менеджеру": "; ".join(ctx["offer"]),
+        "Риски": "; ".join(ctx["risks"]),
+        "Точки соприкосновения": "; ".join(ctx["touch_points"]),
+        "Следующий шаг": (
+            "Связаться в ближайшее время, подтвердить понимание запроса и предложить конкретное решение с датой/сроком."
+        ),
+    }
 
-def _gemini_insight(customer, leads: list, ctx: dict) -> str | None:
+    body = "\n\n".join(f"## {title}\n{text}" for title, text in sections.items())
+    return f"🤖 AI-подсказка (локальный анализ)\n\n{body}"
+
+
+def _gemini_models() -> list[str]:
+    preferred = (settings.gemini_model or "gemini-2.5-flash").strip()
+    fallbacks = [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-flash-latest",
+        "gemini-3.5-flash",
+        "gemini-3-flash-preview",
+        "gemini-flash-lite-latest",
+    ]
+    models = []
+    if preferred:
+        models.append(preferred)
+    for m in fallbacks:
+        if m not in models:
+            models.append(m)
+    return models
+
+
+def _call_gemini(prompt: str) -> tuple[str | None, str | None, str | None]:
+    """Returns (text, error_code, model_used)."""
     key = (settings.gemini_api_key or "").strip()
     if not key:
-        return None
+        return None, "no_key", None
 
-    lead_lines = []
-    for l in leads[:12]:
-        line = f"- [{_lead_status(l)} / {_lead_source(l)}] {l.message or '(без текста)'}"
-        lead_lines.append(line)
-        for c in getattr(l, "comments", []) or []:
-            lead_lines.append(f"  · комментарий: {c.text}")
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 2048},
+    }
+    last_error = "error"
+    quota_hits = 0
 
-    prompt = f"""Ты CRM-аналитик для малого бизнеса в Казахстане. Проанализируй клиента и дай краткие практичные рекомендации менеджеру на русском языке.
+    for model in _gemini_models():
+        try:
+            r = httpx.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                params={"key": key},
+                json=payload,
+                timeout=60.0,
+            )
+            if r.status_code == 429:
+                quota_hits += 1
+                last_error = "quota"
+                continue
+            if r.status_code == 404:
+                last_error = f"model_not_found:{model}"
+                continue
+            if r.status_code != 200:
+                detail = r.text[:200]
+                last_error = f"http_{r.status_code}:{detail}"
+                continue
+            data = r.json()
+            text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            return text, None, model
+        except Exception as exc:
+            last_error = f"error:{exc.__class__.__name__}"
+            continue
 
-Клиент: {customer.name}
-Телефон: {customer.phone or '—'}
-Email: {customer.email or '—'}
-VIP: {'да' if customer.is_vip else 'нет'}
-Визитов: {customer.visit_count}
-Заметки: {customer.notes or '—'}
+    if quota_hits and quota_hits == len(_gemini_models()):
+        return None, "quota", None
+    return None, last_error, None
 
-История обращений ({len(leads)}):
-{chr(10).join(lead_lines) if lead_lines else 'нет заявок'}
 
-Выявленные сигналы: {', '.join(ctx['pains'])}
+def _gemini_insight(customer, leads: list, ctx: dict) -> tuple[str | None, str | None, str | None]:
+    key = (settings.gemini_api_key or "").strip()
+    if not key:
+        return None, "no_key", None
 
-Ответь структурированно (4–6 абзацев):
-1) Краткий портрет клиента
-2) Основные потребности и боли
-3) Рекомендуемый тон общения
-4) Что предложить сейчас
-5) Риски (если есть)
-6) Следующий шаг для менеджера"""
+    prompt = f"""Ты опытный управляющий и администратор малого бизнеса в Казахстане. Менеджер открыл карточку клиента и просит краткую предысторию для работы с ним.
 
-    try:
-        r = httpx.post(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-            params={"key": key},
-            json={"contents": [{"parts": [{"text": prompt}]}]},
-            timeout=45.0,
-        )
-        if r.status_code != 200:
-            return None
-        data = r.json()
-        text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        return f"🤖 AI-подсказка (Gemini)\n\n{text}"
-    except Exception:
-        return None
+Изучи актуальную карточку клиента и полную историю обращений (заявки, статусы, комментарии менеджеров, заметки). Учти все изменения в карточке.
+
+=== КАРТОЧКА КЛИЕНТА ===
+{_format_customer_card(customer)}
+
+=== ИСТОРИЯ ОБРАЩЕНИЙ ({len(leads)} шт.) ===
+{_format_lead_history(leads)}
+
+=== АВТОМАТИЧЕСКИ ВЫЯВЛЕННЫЕ СИГНАЛЫ ===
+Боли/мотивы: {', '.join(ctx['pains']) if ctx['pains'] else 'не определены'}
+Активных заявок: {ctx['active_leads']}
+
+Напиши на русском языке структурированный бриф для менеджера. Будь конкретным, практичным, как наставник с опытом 15+ лет. Не выдумывай факты — опирайся только на данные выше.
+
+Используй РОВНО эти заголовки (каждый с ##):
+
+## Предыстория
+Краткая хронология: кто клиент, как обращался, что происходило, какие заказы/вопросы/инциденты.
+
+## Портрет клиента
+Тип клиента, приоритеты, что для него важно, уровень лояльности.
+
+## Настрой и характер
+Эмоциональный фон, ожидания, как лучше выстроить диалог.
+
+## Рекомендации менеджеру
+Советы как опытный администратор: что сказать, что предложить, чего избегать.
+
+## Риски
+На что обратить внимание: конфликт, уход, недовольство, срыв сроков.
+
+## Точки соприкосновения
+Конкретные зацепки для решения текущих вопросов, заказов или инцидентов.
+
+## Следующий шаг
+Один чёткий action-план на ближайшие 24–48 часов."""
+
+    text, err, model = _call_gemini(prompt)
+    if text:
+        header = f"🤖 AI-бриф для менеджера (Gemini · {model})"
+        return f"{header}\n\n{text}", None, model
+    return None, err, model
 
 
 def generate_customer_insight(customer, leads: list) -> dict:
     ctx = _collect_context(customer, leads)
-    gemini_text = _gemini_insight(customer, leads, ctx)
-    source = "gemini" if gemini_text else "heuristic"
-    insight = gemini_text or _heuristic_insight(customer, ctx)
+    gemini_text, gemini_error, gemini_model = _gemini_insight(customer, leads, ctx)
+
+    if gemini_text:
+        insight = gemini_text
+        source = "gemini"
+    else:
+        insight = _heuristic_insight(customer, leads, ctx)
+        source = "heuristic"
+        if gemini_error == "quota":
+            insight = (
+                "⚠️ Лимит Gemini на всех моделях исчерпан — показан локальный анализ. Повторите через несколько минут.\n\n"
+                + insight
+            )
+        elif gemini_error == "no_key":
+            insight = (
+                "⚠️ Ключ GEMINI_API_KEY не задан — локальный анализ.\n\n" + insight
+            )
+        elif gemini_error:
+            insight = f"⚠️ Gemini недоступен ({gemini_error}) — локальный анализ.\n\n{insight}"
+
+    sections = _parse_sections(insight.split("\n\n", 1)[-1] if "\n\n" in insight else insight)
 
     return {
         "insight": insight,
+        "sections": sections,
         "pains": ctx["pains"],
         "suggestions": ctx["offer"],
+        "risks": ctx["risks"],
+        "touch_points": ctx["touch_points"],
         "tone": ctx["tone"],
         "leads_count": ctx["leads_count"],
+        "active_leads": ctx["active_leads"],
         "top_source": ctx["top_source"],
         "source": source,
+        "gemini_error": gemini_error,
+        "gemini_model": gemini_model,
         "generated_at": datetime.utcnow().isoformat(),
     }

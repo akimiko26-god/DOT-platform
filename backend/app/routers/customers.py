@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 import json
 from sqlalchemy.orm import Session
 
@@ -9,6 +9,28 @@ from app.models import Customer, CustomerInsightLog, Lead, LeadComment, User
 from app.schemas import CustomerCreate, CustomerDetailOut, CustomerOut, CustomerUpdate
 
 router = APIRouter(prefix="/api/companies/{company_id}/customers", tags=["customers"])
+
+
+def _load_customer_leads(db, company_id: int, customer: Customer) -> list:
+    leads = (
+        db.query(Lead)
+        .filter(Lead.company_id == company_id)
+        .filter(
+            (Lead.customer_id == customer.id)
+            | (Lead.client_phone == customer.phone)
+            | (Lead.client_email == customer.email)
+        )
+        .order_by(Lead.created_at.desc())
+        .all()
+    )
+    for l in leads:
+        l.comments = (
+            db.query(LeadComment)
+            .filter(LeadComment.lead_id == l.id)
+            .order_by(LeadComment.created_at)
+            .all()
+        )
+    return leads
 
 
 @router.get("", response_model=list[CustomerOut])
@@ -42,25 +64,7 @@ def get_customer(
     ).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Клиент не найден")
-    leads = (
-        db.query(Lead)
-        .filter(Lead.company_id == company_id)
-        .filter(
-            (Lead.customer_id == customer.id)
-            | (Lead.client_phone == customer.phone)
-            | (Lead.client_email == customer.email)
-        )
-        .order_by(Lead.created_at.desc())
-        .all()
-    )
-    for l in leads:
-        l.comments = (
-            db.query(LeadComment).filter(LeadComment.lead_id == l.id).order_by(LeadComment.created_at).all()
-        )
-    insight_data = generate_customer_insight(customer, leads)
-    if not customer.ai_insight:
-        customer.ai_insight = insight_data["insight"]
-        db.commit()
+    leads = _load_customer_leads(db, company_id, customer)
     return CustomerDetailOut(
         id=customer.id,
         name=customer.name,
@@ -73,7 +77,7 @@ def get_customer(
         created_at=customer.created_at,
         updated_at=customer.updated_at,
         leads=leads,
-        insight_meta=insight_data,
+        insight_meta={},
     )
 
 
@@ -81,6 +85,7 @@ def get_customer(
 def refresh_insight(
     company_id: int,
     customer_id: int,
+    card: CustomerUpdate | None = Body(default=None),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -90,21 +95,12 @@ def refresh_insight(
     ).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Клиент не найден")
-    leads = (
-        db.query(Lead)
-        .filter(Lead.company_id == company_id)
-        .filter(
-            (Lead.customer_id == customer.id)
-            | (Lead.client_phone == customer.phone)
-            | (Lead.client_email == customer.email)
-        )
-        .order_by(Lead.created_at.desc())
-        .all()
-    )
-    for l in leads:
-        l.comments = (
-            db.query(LeadComment).filter(LeadComment.lead_id == l.id).order_by(LeadComment.created_at).all()
-        )
+
+    for key, value in (card.model_dump(exclude_unset=True) if card else {}).items():
+        setattr(customer, key, value)
+    db.flush()
+
+    leads = _load_customer_leads(db, company_id, customer)
     data = generate_customer_insight(customer, leads)
     customer.ai_insight = data["insight"]
     db.add(

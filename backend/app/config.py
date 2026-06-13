@@ -1,6 +1,9 @@
 import os
+from pathlib import Path
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 
 def _default_frontend_url() -> str:
@@ -30,10 +33,14 @@ class Settings(BaseSettings):
     reset_token_expire_hours: int = 24
     admin_email: str = ""
     gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
     seed_demo: bool = False
 
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(
+        env_file=str(_BACKEND_DIR / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 settings = Settings()
