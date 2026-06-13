@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { logout } from '../api/client'
 import { useUser } from '../hooks/useUser'
@@ -10,6 +10,7 @@ export default function ProfileMenu() {
   const { user, isAdmin, permsFor, loading: userLoading } = useUser()
   const { company, companyId, select, companies } = useCompany()
   const [open, setOpen] = useState(false)
+  const [theme, setTheme] = useState(() => localStorage.getItem('dot_theme') || 'dark')
   const closeTimer = useRef(null)
   const nav = useNavigate()
   const perms = permsFor(companyId)
@@ -31,6 +32,13 @@ export default function ProfileMenu() {
   }
 
   const toggle = () => setOpen((v) => !v)
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('dot_theme', theme)
+  }, [theme])
+
+  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
 
   return (
     <div
@@ -81,6 +89,13 @@ export default function ProfileMenu() {
               <Link to="/app/employees" onClick={() => setOpen(false)}>Сотрудники</Link>
             )}
           </nav>
+
+          <div className="profile-theme-row">
+            <span className="profile-label">Тема интерфейса</span>
+            <button type="button" className="theme-switch" onClick={toggleTheme}>
+              {theme === 'dark' ? '☀ Дневная тема' : '🌙 Ночная тема'}
+            </button>
+          </div>
 
           {!isAdmin && companies.length > 1 && (
             <div className="profile-switch">

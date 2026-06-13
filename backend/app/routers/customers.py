@@ -2,11 +2,18 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 import json
 from sqlalchemy.orm import Session
 
-from app.ai_insights import generate_customer_insight
+from app.ai_insights import ask_customer_advice, generate_customer_insight
+from app.audit_helpers import log_audit
 from app.auth import get_company_for_user, get_current_user
 from app.database import get_db
 from app.models import Customer, CustomerInsightLog, Lead, LeadComment, User
-from app.schemas import CustomerCreate, CustomerDetailOut, CustomerOut, CustomerUpdate
+from app.schemas import (
+    CustomerAskAiIn,
+    CustomerCreate,
+    CustomerDetailOut,
+    CustomerOut,
+    CustomerUpdate,
+)
 
 router = APIRouter(prefix="/api/companies/{company_id}/customers", tags=["customers"])
 
@@ -103,6 +110,7 @@ def refresh_insight(
     leads = _load_customer_leads(db, company_id, customer)
     data = generate_customer_insight(customer, leads)
     customer.ai_insight = data["insight"]
+    log_audit(db, user, "refresh_ai_insight", "customer", customer.id, "Обновлён AI-бриф")
     db.add(
         CustomerInsightLog(
             customer_id=customer.id,
@@ -113,6 +121,27 @@ def refresh_insight(
     )
     db.commit()
     return data
+
+
+@router.post("/{customer_id}/ask-ai")
+def ask_ai(
+    company_id: int,
+    customer_id: int,
+    body: CustomerAskAiIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    get_company_for_user(company_id, user, db, module="crm")
+    customer = db.query(Customer).filter(
+        Customer.id == customer_id, Customer.company_id == company_id
+    ).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Клиент не найден")
+    leads = _load_customer_leads(db, company_id, customer)
+    result = ask_customer_advice(customer, leads, body.question, customer.ai_insight or "")
+    log_audit(db, user, "ask_ai", "customer", customer.id, body.question[:200])
+    db.commit()
+    return result
 
 
 @router.post("", response_model=CustomerOut, status_code=201)
@@ -127,6 +156,8 @@ def create_customer(
     db.add(customer)
     db.commit()
     db.refresh(customer)
+    log_audit(db, user, "create", "customer", customer.id, customer.name)
+    db.commit()
     return customer
 
 
@@ -148,6 +179,8 @@ def update_customer(
         setattr(customer, key, value)
     db.commit()
     db.refresh(customer)
+    log_audit(db, user, "update", "customer", customer.id, "Изменена карточка")
+    db.commit()
     return customer
 
 
@@ -164,5 +197,6 @@ def delete_customer(
     ).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Клиент не найден")
+    log_audit(db, user, "delete", "customer", customer.id, customer.name)
     db.delete(customer)
     db.commit()

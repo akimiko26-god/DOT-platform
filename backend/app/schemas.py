@@ -115,6 +115,14 @@ class CompanySlideCreate(BaseModel):
     caption: str = ""
 
 
+class CompanySlidesReplace(BaseModel):
+    slides: list[CompanySlideCreate] = Field(default_factory=list)
+
+
+class CustomerAskAiIn(BaseModel):
+    question: str = Field(min_length=2, max_length=500)
+
+
 class PublicCompanyOut(CompanyOut):
     slides: list[CompanySlideOut] = []
 
@@ -454,6 +462,41 @@ class AdminUserOut(BaseModel):
     is_online: bool = False
     last_seen_at: Optional[datetime] = None
     created_at: datetime
+    company_ids: list[int] = []
+    company_names: list[str] = []
+
+    class Config:
+        from_attributes = True
+
+
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6)
+    full_name: str = Field(min_length=2)
+    is_admin: bool = False
+    is_active: bool = True
+
+
+class AdminUserUpdate(BaseModel):
+    is_admin: Optional[bool] = None
+    is_active: Optional[bool] = None
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+
+class AdminResetPasswordIn(BaseModel):
+    password: str = Field(min_length=6)
+
+
+class AuditLogOut(BaseModel):
+    id: int
+    user_id: Optional[int] = None
+    user_name: str = ""
+    action: str
+    entity_type: str
+    entity_id: Optional[int] = None
+    details: str
+    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -479,3 +522,4 @@ class AdminCompanyOut(BaseModel):
 class AdminCompanyUpdate(BaseModel):
     is_active: Optional[bool] = None
     name: Optional[str] = None
+    slug: Optional[str] = None

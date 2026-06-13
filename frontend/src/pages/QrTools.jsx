@@ -16,12 +16,19 @@ const DEFAULT_CUSTOM = {
   fg_color: '#ffffff',
   accent_color: '#3d9cf5',
   accent2_color: '#a855f7',
+  title_color: '#ffffff',
+  subtitle_color: '#3d9cf5',
+  border_color: '#3d9cf5',
+  qr_color: '#ffffff',
+  qr_bg_color: '#1e293b',
+  badge_color: '#3d9cf5',
   qr_scale: 0.52,
   show_dots: true,
   show_stars: false,
   show_gradient: true,
   show_badge: true,
   frame_style: 'rounded',
+  card_icon: 'smartphone',
 }
 
 const SOCIAL = [
@@ -234,13 +241,46 @@ export default function QrTools() {
 
           {isEditingCustom && (
             <>
-              <p className="emp-meta">Настройте вид и сохраните — после сохранения шаблон можно только выбрать или удалить.</p>
-              <div className="qr-control-group">
-                <label>Фон</label>
-                <div className="qr-color-row">
-                  <input type="color" value={custom.bg_color} onChange={(e) => setCustom((c) => ({ ...c, bg_color: e.target.value }))} />
-                  <input className="input-unified" value={custom.bg_color} onChange={(e) => setCustom((c) => ({ ...c, bg_color: e.target.value }))} />
-                </div>
+              <p className="emp-meta">Настройте цвета, иконку и рамку QR. Сохраните шаблон для повторного использования.</p>
+              <div className="qr-custom-grid">
+                {[
+                  ['bg_color', 'Фон'],
+                  ['title_color', 'Заголовок'],
+                  ['subtitle_color', 'Подраздел'],
+                  ['border_color', 'Обводка QR'],
+                  ['qr_color', 'Цвет QR'],
+                  ['qr_bg_color', 'Фон QR'],
+                  ['badge_color', 'Кнопка внизу'],
+                  ['accent_color', 'Акцент 1'],
+                  ['accent2_color', 'Акцент 2'],
+                ].map(([key, label]) => (
+                  <div key={key} className="qr-control-group">
+                    <label>{label}</label>
+                    <div className="qr-color-row">
+                      <input type="color" value={custom[key]} onChange={(e) => setCustom((c) => ({ ...c, [key]: e.target.value }))} />
+                      <input className="input-unified" value={custom[key]} onChange={(e) => setCustom((c) => ({ ...c, [key]: e.target.value }))} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="field">
+                <label>Иконка на QR</label>
+                <select className="input-unified" value={custom.card_icon} onChange={(e) => setCustom((c) => ({ ...c, card_icon: e.target.value }))}>
+                  <option value="none">Без иконки</option>
+                  <option value="dots">Точки</option>
+                  <option value="phone">Телефон</option>
+                  <option value="smartphone">Смартфон</option>
+                  <option value="pen">Ручка / документ</option>
+                </select>
+              </div>
+              <div className="field">
+                <label>Стиль рамки</label>
+                <select className="input-unified" value={custom.frame_style} onChange={(e) => setCustom((c) => ({ ...c, frame_style: e.target.value }))}>
+                  <option value="rounded">Скруглённая</option>
+                  <option value="sharp">Прямая</option>
+                  <option value="dashed">Пунктир</option>
+                  <option value="none">Без рамки</option>
+                </select>
               </div>
               <div className="qr-control-group">
                 <label>Размер QR ({Math.round(custom.qr_scale * 100)}%)</label>
@@ -253,30 +293,29 @@ export default function QrTools() {
                   <button type="button" className="btn btn-outline" onClick={saveTemplate}>Сохранить</button>
                 </div>
               </div>
+              <div className="card card-inner-padded" style={{ marginTop: '1rem', background: 'var(--surface2)' }}>
+                <h4>Свои ссылки для QR</h4>
+                <p className="emp-meta">Свои URL (сайт, акция, форма и т.д.)</p>
+                <div className="ref-form-row">
+                  <input className="input-unified" placeholder="Название" value={linkName} onChange={(e) => setLinkName(e.target.value)} />
+                </div>
+                <div className="ref-form-row" style={{ marginTop: '0.5rem' }}>
+                  <input className="input-unified" placeholder="https://…" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} />
+                  <button type="button" className="btn btn-outline" onClick={addCustomLink}>Добавить</button>
+                </div>
+                <ul className="ref-list scroll-panel" style={{ marginTop: '0.75rem', maxHeight: 140 }}>
+                  {customLinks.map((l) => (
+                    <li key={l.id}>
+                      <span>{l.name}</span>
+                      <button type="button" className="ref-del" onClick={() => deleteCustomLink(l.id, l.name)}>×</button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </>
           )}
 
-          <div className="card" style={{ marginTop: '1rem', background: 'var(--surface2)' }}>
-            <h4>Созданные мной ссылки</h4>
-            <p className="emp-meta">Свои URL для QR (сайт, акция, форма и т.д.)</p>
-            <div className="ref-form-row">
-              <input className="input-unified" placeholder="Название" value={linkName} onChange={(e) => setLinkName(e.target.value)} />
-            </div>
-            <div className="ref-form-row" style={{ marginTop: '0.5rem' }}>
-              <input className="input-unified" placeholder="https://…" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} />
-              <button type="button" className="btn btn-outline" onClick={addCustomLink}>Добавить</button>
-            </div>
-            <ul className="ref-list scroll-panel" style={{ marginTop: '0.75rem', maxHeight: 140 }}>
-              {customLinks.map((l) => (
-                <li key={l.id}>
-                  <span>{l.name}</span>
-                  <button type="button" className="ref-del" onClick={() => deleteCustomLink(l.id, l.name)}>×</button>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {links && (
+          {!isEditingCustom && links && (
             <>
               <p style={{ wordBreak: 'break-all', color: 'var(--muted)', fontSize: '0.9rem', marginTop: '0.75rem' }}>{links.url}</p>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>

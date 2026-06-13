@@ -40,6 +40,12 @@ export default function Customers() {
 
   const [aiLoading, setAiLoading] = useState(false)
 
+  const [aiQuestion, setAiQuestion] = useState('')
+
+  const [aiAnswer, setAiAnswer] = useState('')
+
+  const [aiAskLoading, setAiAskLoading] = useState(false)
+
 
 
   const load = () => {
@@ -147,6 +153,34 @@ export default function Customers() {
     } finally {
 
       setAiLoading(false)
+
+    }
+
+  }
+
+
+
+  const askAi = async () => {
+
+    if (!selected || !aiQuestion.trim()) return
+
+    setAiAskLoading(true)
+
+    try {
+
+      const data = await api(`/companies/${companyId}/customers/${selected.id}/ask-ai`, {
+
+        method: 'POST',
+
+        body: JSON.stringify({ question: aiQuestion.trim() }),
+
+      })
+
+      setAiAnswer(data.answer)
+
+    } finally {
+
+      setAiAskLoading(false)
 
     }
 
@@ -369,6 +403,38 @@ export default function Customers() {
                 </div>
 
               )}
+
+              <div className="ai-ask-box">
+
+                <label className="profile-label">Спросить совет у ИИ</label>
+
+                <div className="ai-ask-row">
+
+                  <input
+
+                    className="input-unified"
+
+                    placeholder="Например: как лучше ответить на последнюю жалобу?"
+
+                    value={aiQuestion}
+
+                    onChange={(e) => setAiQuestion(e.target.value)}
+
+                    onKeyDown={(e) => e.key === 'Enter' && askAi()}
+
+                  />
+
+                  <button type="button" className="btn btn-outline" onClick={askAi} disabled={aiAskLoading}>
+
+                    {aiAskLoading ? '…' : 'Спросить'}
+
+                  </button>
+
+                </div>
+
+                {aiAnswer && <FormattedText text={aiAnswer} className="ai-ask-answer" tag="div" />}
+
+              </div>
 
             </div>
 

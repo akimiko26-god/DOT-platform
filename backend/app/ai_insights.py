@@ -198,33 +198,24 @@ def _collect_context(customer, leads: list) -> dict:
 
 
 def _heuristic_insight(customer, leads: list, ctx: dict) -> str:
-    history_brief = (
-        f"{'Повторный' if ctx['repeat'] else 'Новый'} клиент, {customer.visit_count} обращений. "
-        f"Основной канал: {ctx['top_source']}. "
-        f"Активных заявок: {ctx['active_leads']}."
-    )
-    if customer.is_vip:
-        history_brief += " Статус VIP — повышенное внимание."
-
-    portrait = (
-        f"По истории: {', '.join(ctx['pains'][:3]) if ctx['pains'] else 'стандартный запрос'}. "
-        f"Комментариев менеджеров: {len(ctx['comments'])}."
-    )
+    comments_note = ""
+    if ctx["comments"]:
+        comments_note = f" Комментариев менеджеров: {len(ctx['comments'])}."
 
     sections = {
-        "Предыстория": history_brief,
-        "Портрет клиента": portrait,
-        "Настрой и характер": f"Рекомендуемый тон: {ctx['tone']}.",
-        "Рекомендации менеджеру": "; ".join(ctx["offer"]),
-        "Риски": "; ".join(ctx["risks"]),
-        "Точки соприкосновения": "; ".join(ctx["touch_points"]),
-        "Следующий шаг": (
-            "Связаться в ближайшее время, подтвердить понимание запроса и предложить конкретное решение с датой/сроком."
+        "Ситуация": (
+            f"{'Повторный' if ctx['repeat'] else 'Новый'} клиент · {customer.visit_count} обращений · "
+            f"канал {ctx['top_source']}. Активных заявок: {ctx['active_leads']}."
+            + (" VIP." if customer.is_vip else "")
+            + comments_note
         ),
+        "Настрой": f"Тон общения: {ctx['tone']}.",
+        "Важно знать": "; ".join(ctx["pains"][:4]) if ctx["pains"] else "Явных проблем не видно.",
+        "Что предпринять": "; ".join(ctx["offer"][:3]),
+        "Риски": "; ".join(ctx["risks"][:2]),
     }
-
     body = "\n\n".join(f"## {title}\n{text}" for title, text in sections.items())
-    return f"🤖 AI-подсказка (локальный анализ)\n\n{body}"
+    return f"🤖 AI-бриф (локальный анализ)\n\n{body}"
 
 
 def _gemini_models() -> list[str]:
@@ -295,44 +286,25 @@ def _gemini_insight(customer, leads: list, ctx: dict) -> tuple[str | None, str |
     if not key:
         return None, "no_key", None
 
-    prompt = f"""Ты опытный управляющий и администратор малого бизнеса в Казахстане. Менеджер открыл карточку клиента и просит краткую предысторию для работы с ним.
+    prompt = f"""Ты опытный управляющий малого бизнеса в Казахстане. Составь КОРОТКИЙ бриф для менеджера (не более 500 слов).
 
-Изучи актуальную карточку клиента и полную историю обращений (заявки, статусы, комментарии менеджеров, заметки). Учти все изменения в карточке.
-
-=== КАРТОЧКА КЛИЕНТА ===
+=== КАРТОЧКА ===
 {_format_customer_card(customer)}
 
-=== ИСТОРИЯ ОБРАЩЕНИЙ ({len(leads)} шт.) ===
+=== ИСТОРИЯ ({len(leads)} обращений) ===
 {_format_lead_history(leads)}
 
-=== АВТОМАТИЧЕСКИ ВЫЯВЛЕННЫЕ СИГНАЛЫ ===
-Боли/мотивы: {', '.join(ctx['pains']) if ctx['pains'] else 'не определены'}
-Активных заявок: {ctx['active_leads']}
+Сигналы: {', '.join(ctx['pains'][:5]) if ctx['pains'] else 'нет'}
 
-Напиши на русском языке структурированный бриф для менеджера. Будь конкретным, практичным, как наставник с опытом 15+ лет. Не выдумывай факты — опирайся только на данные выше.
-
-Используй РОВНО эти заголовки (каждый с ##):
-
-## Предыстория
-Краткая хронология: кто клиент, как обращался, что происходило, какие заказы/вопросы/инциденты.
-
-## Портрет клиента
-Тип клиента, приоритеты, что для него важно, уровень лояльности.
-
-## Настрой и характер
-Эмоциональный фон, ожидания, как лучше выстроить диалог.
-
-## Рекомендации менеджеру
-Советы как опытный администратор: что сказать, что предложить, чего избегать.
-
+Используй заголовки ## (по 2–4 предложения каждый):
+## Ситуация
+## Комментарии и заявки
+## Настрой клиента
+## Важно знать
+## Что предпринять
 ## Риски
-На что обратить внимание: конфликт, уход, недовольство, срыв сроков.
 
-## Точки соприкосновения
-Конкретные зацепки для решения текущих вопросов, заказов или инцидентов.
-
-## Следующий шаг
-Один чёткий action-план на ближайшие 24–48 часов."""
+Только факты из данных. Без воды."""
 
     text, err, model = _call_gemini(prompt)
     if text:
@@ -381,3 +353,36 @@ def generate_customer_insight(customer, leads: list) -> dict:
         "gemini_model": gemini_model,
         "generated_at": datetime.utcnow().isoformat(),
     }
+
+
+def ask_customer_advice(customer, leads: list, question: str, prior_insight: str = "") -> dict:
+    ctx = _collect_context(customer, leads)
+    q = (question or "").strip()
+    if not q:
+        return {"answer": "Введите вопрос для ИИ.", "source": "local"}
+
+    prompt = f"""Менеджер CRM задаёт вопрос по клиенту. Ответь кратко (до 150 слов), по делу, на русском.
+
+Клиент: {customer.name}, VIP={customer.is_vip}, визитов={customer.visit_count}
+Заметки: {customer.notes or '—'}
+
+История:
+{_format_lead_history(leads)[:2500]}
+
+Текущий бриф:
+{(prior_insight or 'нет')[:1200]}
+
+Вопрос менеджера: {q}"""
+
+    text, err, model = _call_gemini(prompt)
+    if text:
+        return {"answer": text, "source": "gemini", "gemini_model": model}
+    fallback = (
+        f"По клиенту «{customer.name}»: {ctx['tone']}. "
+        f"Рекомендация: {ctx['offer'][0] if ctx['offer'] else 'уточните запрос клиента.'}"
+    )
+    if err == "quota":
+        fallback = "Лимит Gemini исчерпан. " + fallback
+    elif err == "no_key":
+        fallback = "Gemini не настроен. " + fallback
+    return {"answer": fallback, "source": "heuristic", "gemini_error": err}

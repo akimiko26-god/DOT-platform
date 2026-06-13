@@ -1,60 +1,74 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, uploadImage, uploadLogo } from '../api/client'
 import CompanyPicker from '../components/CompanyPicker'
-import ImageDropzone from '../components/ImageDropzone'
 import { useCompany } from '../hooks/useCompany'
 
 export default function CompanySettings() {
   const { companies, company, companyId, select, loading, setCompanies } = useCompany()
   const [form, setForm] = useState(null)
-  const [slides, setSlides] = useState([])
+  const [draftSlides, setDraftSlides] = useState([])
   const [slideCaption, setSlideCaption] = useState('')
   const [saved, setSaved] = useState(false)
+  const [logoFile, setLogoFile] = useState(null)
+  const [logoPreview, setLogoPreview] = useState('')
+  const fileInputRef = useRef(null)
+  const slideInputRef = useRef(null)
 
   useEffect(() => {
-    if (company) setForm({ ...company })
+    if (company) {
+      setForm({ ...company })
+      setLogoPreview(company.logo_url || '')
+      setLogoFile(null)
+    }
   }, [company])
 
   useEffect(() => {
     if (!companyId) return
-    api(`/companies/${companyId}/slides`).then(setSlides).catch(() => setSlides([]))
+    api(`/companies/${companyId}/slides`)
+      .then((list) => setDraftSlides(list.map((s) => ({ image_url: s.image_url, caption: s.caption || '' }))))
+      .catch(() => setDraftSlides([]))
   }, [companyId])
+
+  const onPickLogo = (file) => {
+    setLogoFile(file)
+    setLogoPreview(URL.createObjectURL(file))
+  }
+
+  const onPickSlide = async (file) => {
+    const { url } = await uploadImage(companyId, file)
+    setDraftSlides((s) => [...s, { image_url: url, caption: slideCaption }].slice(0, 10))
+    setSlideCaption('')
+  }
+
+  const removeDraftSlide = (idx) => {
+    setDraftSlides((s) => s.filter((_, i) => i !== idx))
+  }
 
   const save = async (e) => {
     e.preventDefault()
+    let logoUrl = form.logo_url
+    if (logoFile) {
+      const { url } = await uploadLogo(companyId, logoFile)
+      logoUrl = url
+    }
+    const payload = { ...form, logo_url: logoUrl }
     const updated = await api(`/companies/${companyId}`, {
       method: 'PATCH',
-      body: JSON.stringify(form),
+      body: JSON.stringify(payload),
+    })
+    await api(`/companies/${companyId}/slides`, {
+      method: 'PUT',
+      body: JSON.stringify({ slides: draftSlides }),
     })
     setCompanies((list) => list.map((c) => (c.id === updated.id ? updated : c)))
+    setForm({ ...updated })
+    setLogoFile(null)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
 
-  const onLogo = async (file) => {
-    const { url } = await uploadLogo(companyId, file)
-    setForm((f) => ({ ...f, logo_url: url }))
-    const updated = await api(`/companies/${companyId}`, { method: 'PATCH', body: JSON.stringify({ logo_url: url }) })
-    setCompanies((list) => list.map((c) => (c.id === updated.id ? updated : c)))
-  }
-
-  const addSlide = async (file) => {
-    const { url } = await uploadImage(companyId, file)
-    const slide = await api(`/companies/${companyId}/slides`, {
-      method: 'POST',
-      body: JSON.stringify({ image_url: url, caption: slideCaption }),
-    })
-    setSlides((s) => [...s, slide])
-    setSlideCaption('')
-  }
-
-  const removeSlide = async (id) => {
-    await api(`/companies/${companyId}/slides/${id}`, { method: 'DELETE' })
-    setSlides((s) => s.filter((x) => x.id !== id))
-  }
-
-  if (loading) return <p>Загрузка…</p>
+  if (loading) return <p className="page-empty">Загрузка…</p>
 
   return (
     <div>
@@ -62,18 +76,19 @@ export default function CompanySettings() {
       <CompanyPicker companies={companies} companyId={companyId} onSelect={select} />
 
       {form && (
-        <form className="card" onSubmit={save}>
+        <form className="card card-padded" onSubmit={save}>
           <h3 className="section-title">Бренд и публичная страница</h3>
-          <p className="emp-meta field-hint">Логотип и слайдер видят клиенты при сканировании QR «Страница компании».</p>
+          <p className="emp-meta field-hint">Логотип и слайдер сохраняются кнопкой «Сохранить» внизу формы.</p>
           <div className="brand-upload-row">
             <div className="brand-logo-block">
               <label className="profile-label">Логотип / аватарка</label>
-              {form.logo_url ? (
-                <img src={form.logo_url} alt="" className="company-logo-preview" />
+              {logoPreview ? (
+                <img src={logoPreview} alt="" className="company-logo-preview" />
               ) : (
                 <div className="company-logo-placeholder">Нет лого</div>
               )}
-              <ImageDropzone previewUrl={form.logo_url} onUpload={onLogo} />
+              <input type="file" accept="image/*" hidden ref={fileInputRef} onChange={(e) => e.target.files?.[0] && onPickLogo(e.target.files[0])} />
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => fileInputRef.current?.click()}>Выбрать файл</button>
             </div>
             <div className="brand-slides-block">
               <label className="profile-label">Слайдер (до 10 фото)</label>
@@ -83,16 +98,20 @@ export default function CompanySettings() {
                 value={slideCaption}
                 onChange={(e) => setSlideCaption(e.target.value)}
               />
-              <ImageDropzone onUpload={addSlide} />
-              <ul className="slide-admin-list">
-                {slides.map((s) => (
-                  <li key={s.id} className="slide-admin-item">
+              <div className="slide-grid-row">
+                {draftSlides.map((s, idx) => (
+                  <div key={`${s.image_url}-${idx}`} className="slide-grid-item">
                     <img src={s.image_url} alt="" />
-                    <span>{s.caption || 'Без подписи'}</span>
-                    <button type="button" className="btn btn-outline btn-sm" onClick={() => removeSlide(s.id)}>×</button>
-                  </li>
+                    <button type="button" className="slide-grid-remove" onClick={() => removeDraftSlide(idx)} aria-label="Удалить">×</button>
+                  </div>
                 ))}
-              </ul>
+                {draftSlides.length < 10 && (
+                  <>
+                    <input type="file" accept="image/*" hidden ref={slideInputRef} onChange={(e) => e.target.files?.[0] && onPickSlide(e.target.files[0])} />
+                    <button type="button" className="slide-grid-add" onClick={() => slideInputRef.current?.click()} aria-label="Добавить фото">+</button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -138,13 +157,13 @@ export default function CompanySettings() {
             ))}
           </div>
 
-          <button className="btn" type="submit" style={{ marginTop: '1.25rem' }}>
+          <button className="btn form-submit-btn" type="submit">
             {saved ? 'Сохранено ✓' : 'Сохранить'}
           </button>
         </form>
       )}
 
-      <p style={{ marginTop: '1rem' }}>
+      <p className="page-footer-link">
         <Link to="/app/company">+ Добавить ещё одну компанию</Link>
       </p>
     </div>

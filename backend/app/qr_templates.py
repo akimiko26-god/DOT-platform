@@ -101,6 +101,25 @@ def _draw_frame(draw: ImageDraw.ImageDraw, box: tuple, color: str, style: str, w
         draw.rounded_rectangle(box, radius=radius, outline=color, width=width)
 
 
+def _draw_card_icon(draw: ImageDraw.ImageDraw, cx: int, cy: int, icon: str, color: str, size: int = 28):
+    if not icon or icon == "none":
+        return
+    if icon == "phone":
+        w, h = size // 2, size
+        draw.rounded_rectangle((cx - w // 2, cy - h // 2, cx + w // 2, cy + h // 2), radius=6, outline=color, width=3)
+        draw.rectangle((cx - 4, cy + h // 2 - 2, cx + 4, cy + h // 2 + 5), fill=color)
+    elif icon == "smartphone":
+        w, h = size // 2 + 4, size + 6
+        draw.rounded_rectangle((cx - w // 2, cy - h // 2, cx + w // 2, cy + h // 2), radius=8, outline=color, width=3)
+        draw.ellipse((cx - 3, cy + h // 2 - 8, cx + 3, cy + h // 2 - 2), fill=color)
+    elif icon == "pen":
+        draw.polygon([(cx, cy - size // 2), (cx + size // 3, cy), (cx, cy + size // 2), (cx - size // 3, cy)], fill=color)
+        draw.rectangle((cx + size // 4, cy - size // 4, cx + size // 2, cy + size // 4), fill=color)
+    elif icon == "dots":
+        for dx, dy in [(-10, -10), (10, -10), (-10, 10), (10, 10)]:
+            draw.ellipse((cx + dx - 4, cy + dy - 4, cx + dx + 4, cy + dy + 4), fill=color)
+
+
 def render_qr_card(
     url: str,
     company_name: str,
@@ -119,6 +138,12 @@ def render_qr_card(
     fg = _hex(custom.get("fg_color") or custom.get("fg"), base["fg"])
     accent = _hex(custom.get("accent_color") or custom.get("accent"), base["accent"])
     accent2 = _hex(custom.get("accent2_color") or custom.get("accent2"), base["accent2"])
+    title_color = _hex(custom.get("title_color"), fg)
+    subtitle_color = _hex(custom.get("subtitle_color"), accent)
+    border_color = _hex(custom.get("border_color"), accent)
+    qr_fill = _hex(custom.get("qr_color"), fg)
+    qr_bg = _hex(custom.get("qr_bg_color"), bg)
+    badge_color = _hex(custom.get("badge_color"), accent)
 
     qr_scale = float(custom.get("qr_scale", 0.52))
     qr_scale = max(0.32, min(0.65, qr_scale))
@@ -127,6 +152,8 @@ def render_qr_card(
     show_gradient = str(custom.get("show_gradient", "true")).lower() in ("1", "true", "yes")
     frame_style = custom.get("frame_style", "rounded")
     show_badge = str(custom.get("show_badge", "true")).lower() in ("1", "true", "yes")
+    card_icon = custom.get("card_icon", "none")
+    section_label = custom.get("section_label") or caption or ""
 
     w, h = 520, 740
     img = Image.new("RGB", (w, h), bg)
@@ -146,13 +173,13 @@ def render_qr_card(
 
     y_text = header_h + 22
     title = (company_name or "Компания")[:36]
-    draw.text((36, y_text), title, fill=fg, font=_font(26))
+    draw.text((36, y_text), title, fill=title_color, font=_font(26))
     y_text += 36
-    if caption:
-        cap = caption[:56]
-        draw.rounded_rectangle((28, y_text - 4, w - 28, y_text + 30), radius=10, fill=accent + "33")
-        draw.text((40, y_text), cap, fill=accent, font=_font(20))
-        y_text += 42
+    if section_label:
+        section = section_label[:48]
+        draw.rounded_rectangle((28, y_text - 4, w - 28, y_text + 34), radius=10, fill=border_color + "33")
+        draw.text((40, y_text), f"→ {section}", fill=subtitle_color, font=_font(20))
+        y_text += 44
 
     footer_h = 88 if show_badge else 24
     qr_area_top = y_text + 14
@@ -164,19 +191,20 @@ def render_qr_card(
     qr = qrcode.QRCode(version=1, box_size=10, border=1)
     qr.add_data(url)
     qr.make(fit=True)
-    qr_img = qr.make_image(fill_color=fg, back_color=bg).convert("RGB").resize((qr_px, qr_px))
+    qr_img = qr.make_image(fill_color=qr_fill, back_color=qr_bg).convert("RGB").resize((qr_px, qr_px))
 
     x0 = (w - qr_px) // 2
     y0 = qr_area_top + (max_qr_h - qr_px) // 2
     pad = 14
     frame_box = (x0 - pad, y0 - pad, x0 + qr_px + pad, y0 + qr_px + pad)
-    draw.rounded_rectangle(frame_box, radius=20, fill=bg)
-    _draw_frame(draw, frame_box, accent, frame_style, 5)
+    draw.rounded_rectangle(frame_box, radius=20, fill=qr_bg)
+    _draw_frame(draw, frame_box, border_color, frame_style, 5)
+    _draw_card_icon(draw, x0 + qr_px - 24, y0 + 24, card_icon, subtitle_color, 26)
     img.paste(qr_img, (x0, y0))
 
     if show_badge:
         badge = "Откройте камеру →"
-        draw.rounded_rectangle((60, h - 88, w - 60, h - 38), radius=16, fill=accent)
+        draw.rounded_rectangle((60, h - 88, w - 60, h - 38), radius=16, fill=badge_color)
         tw = draw.textlength(badge, font=_font(20))
         draw.text(((w - tw) / 2, h - 74), badge, fill="#ffffff", font=_font(20))
 

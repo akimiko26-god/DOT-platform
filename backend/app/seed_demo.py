@@ -5,6 +5,7 @@ import os
 
 from app.auth import hash_password
 from app.catalog_seed import seed_catalog_refs
+from app.seed_demo_extras import _img_for
 from app.models import (
     CatalogFolder,
     CatalogItem,
@@ -154,6 +155,7 @@ def seed_demo_data(db) -> None:
                     category=cat,
                     tags=json.dumps(["хит продаж"] if ti == 0 else []),
                     price=price,
+                    image_url=_img_for(title),
                     is_published=True,
                     is_available=True,
                     sort_order=ti,

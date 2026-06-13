@@ -32,5 +32,7 @@ def ensure_superadmin(db) -> None:
 
 def ensure_demo_data(db) -> None:
     from app.seed_demo import seed_demo_data
+    from app.seed_demo_extras import ensure_demo_extras
 
     seed_demo_data(db)
+    ensure_demo_extras(db)
