@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client'
 import CompanyPicker from '../components/CompanyPicker'
 import { useCompany } from '../hooks/useCompany'
@@ -18,6 +18,7 @@ export default function Leads() {
   const [leads, setLeads] = useState([])
   const [selected, setSelected] = useState(null)
   const [comment, setComment] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
 
   const load = () => {
     if (!companyId) return
@@ -25,6 +26,16 @@ export default function Leads() {
   }
 
   useEffect(load, [companyId])
+
+  useEffect(() => {
+    setSelected(null)
+    setStatusFilter('')
+  }, [companyId])
+
+  const filteredLeads = useMemo(
+    () => (statusFilter ? leads.filter((l) => l.status === statusFilter) : leads),
+    [leads, statusFilter],
+  )
 
   const updateStatus = async (lead, status) => {
     await api(`/companies/${companyId}/leads/${lead.id}`, {
@@ -50,19 +61,42 @@ export default function Leads() {
     load()
   }
 
-  if (loading) return <p>Загрузка…</p>
+  if (loading) return <p className="page-empty">Загрузка…</p>
 
   return (
     <div>
       <h1 className="page-title">Заявки</h1>
       <CompanyPicker companies={companies} companyId={companyId} onSelect={select} />
 
+      <div className="catalog-toolbar card" style={{ marginBottom: '1rem' }}>
+        <select
+          className="input-unified catalog-toolbar-input"
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value)
+            setSelected(null)
+          }}
+        >
+          <option value="">Все статусы</option>
+          {STATUSES.map((s) => (
+            <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+          ))}
+        </select>
+        {statusFilter && (
+          <span className="emp-meta">
+            Показано: {filteredLeads.length} из {leads.length}
+          </span>
+        )}
+      </div>
+
       <div className="split-layout">
         <div className="card split-panel split-panel--list">
-          {leads.length === 0 ? (
-            <p className="text-muted">Заявок нет</p>
+          {filteredLeads.length === 0 ? (
+            <p className="panel-empty">
+              {leads.length === 0 ? 'Заявок нет' : 'Заявок с выбранным статусом нет'}
+            </p>
           ) : (
-            leads.map((l) => (
+            filteredLeads.map((l) => (
               <button
                 key={l.id}
                 type="button"
@@ -113,7 +147,7 @@ export default function Leads() {
               <button className="btn" type="button" onClick={addComment}>Добавить</button>
             </>
           ) : (
-            <p className="text-muted">Выберите заявку</p>
+            <p className="panel-empty">Выберите заявку</p>
           )}
         </div>
       </div>

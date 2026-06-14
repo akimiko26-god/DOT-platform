@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, uploadImage } from '../api/client'
 import CategoryRefPanel from '../components/CategoryRefPanel'
 import ImageDropzone from '../components/ImageDropzone'
@@ -112,8 +112,21 @@ export default function CatalogManage() {
   const [openFolders, setOpenFolders] = useState({})
   const [showFolderModal, setShowFolderModal] = useState(false)
   const [folderName, setFolderName] = useState('')
+  const folderContextRef = useRef(null)
 
   const effectiveCompanyId = isAdmin && adminCompanyId ? Number(adminCompanyId) : companyId
+
+  const openFolder = (folderId, folderName = null) => {
+    setActiveFolder(folderId)
+    folderContextRef.current = folderId === 'none'
+      ? { kind: 'none' }
+      : { kind: 'folder', name: folderName }
+  }
+
+  const backToFolders = () => {
+    setActiveFolder(null)
+    folderContextRef.current = null
+  }
 
   const loadRefs = useCallback(async () => {
     if (!effectiveCompanyId) return
@@ -143,12 +156,28 @@ export default function CatalogManage() {
   useEffect(() => { if (isAdmin) api('/admin/companies').then(setAdminCompanies) }, [isAdmin])
   useEffect(load, [load])
   useEffect(() => {
-    setActiveFolder(null)
     setSelectedIds([])
     setShowForm(false)
     setEditing(null)
-    setOpenFolders({ none: true })
   }, [effectiveCompanyId])
+
+  useEffect(() => {
+    if (activeFolder == null || !folderContextRef.current) return
+    const ctx = folderContextRef.current
+    if (ctx.kind === 'none') {
+      if (activeFolder !== 'none') setActiveFolder('none')
+      return
+    }
+    if (ctx.kind === 'folder' && ctx.name) {
+      const match = folders.find((f) => f.name === ctx.name)
+      if (match) {
+        if (activeFolder !== match.id) setActiveFolder(match.id)
+      } else {
+        setActiveFolder('none')
+        folderContextRef.current = { kind: 'none' }
+      }
+    }
+  }, [folders, effectiveCompanyId])
   useEffect(() => { if (view === 'list') setActiveFolder(null) }, [view])
   useEffect(() => { setSelectedIds([]) }, [itemStatus, activeFolder])
 
@@ -430,13 +459,13 @@ export default function CatalogManage() {
           {view === 'grid' && !activeFolder && itemStatus !== 'trash' && (
             <div className="catalog-grid folder-grid">
               {folders.map((folder) => (
-                <button key={folder.id} type="button" className="folder-card" onClick={() => setActiveFolder(folder.id)}>
+                <button key={folder.id} type="button" className="folder-card" onClick={() => openFolder(folder.id, folder.name)}>
                   <span className="folder-card-icon">📁</span>
                   <strong>{folder.name}</strong>
                   <span className="emp-meta">{itemsInFolder(folder.id).length} поз.</span>
                 </button>
               ))}
-              <button type="button" className="folder-card" onClick={() => setActiveFolder('none')}>
+              <button type="button" className="folder-card" onClick={() => openFolder('none')}>
                 <span className="folder-card-icon">📂</span>
                 <strong>Без папки</strong>
                 <span className="emp-meta">{itemsNoFolder.length} поз.</span>
@@ -448,7 +477,7 @@ export default function CatalogManage() {
             <div className="folder-detail card" style={{ marginTop: '1rem' }}>
               {view === 'grid' && activeFolder && (
                 <div className="folder-detail-head">
-                  <button type="button" className="btn btn-outline" onClick={() => setActiveFolder(null)}>← К папкам</button>
+                  <button type="button" className="btn btn-outline" onClick={backToFolders}>← К папкам</button>
                   <h3>{activeFolder === 'none' ? 'Без папки' : folders.find((f) => f.id === activeFolder)?.name}</h3>
                 </div>
               )}

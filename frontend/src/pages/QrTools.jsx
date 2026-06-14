@@ -204,6 +204,15 @@ export default function QrTools() {
       </div>
 
       <div className="qr-builder-layout">
+        <div className="qr-builder-preview card">
+          <h3>Предпросмотр {previewLoading && <span className="emp-meta">…</span>}</h3>
+          <p className="qr-preview-caption-top">{targetLabel}</p>
+          <div className="qr-grid-canvas qr-preview-safe">
+            {qrBlob ? <img src={qrBlob} alt="QR" key={previewSignature} /> : <div className="qr-placeholder">…</div>}
+          </div>
+          <p className="emp-meta" style={{ textAlign: 'center', marginTop: '0.5rem' }}>{company?.name}</p>
+        </div>
+
         <div className="qr-builder-controls card">
           <div className="field">
             <label>Куда ведёт QR</label>
@@ -262,6 +271,8 @@ export default function QrTools() {
                     </div>
                   </div>
                 ))}
+              </div>
+              <div className="qr-settings-row">
                 <div className="qr-control-group">
                   <label>Иконка на QR</label>
                   <select className="input-unified" value={custom.card_icon} onChange={(e) => setCustom((c) => ({ ...c, card_icon: e.target.value }))}>
@@ -324,15 +335,6 @@ export default function QrTools() {
               </div>
             </>
           )}
-        </div>
-
-        <div className="qr-builder-preview card">
-          <h3>Предпросмотр {previewLoading && <span className="emp-meta">…</span>}</h3>
-          <p className="qr-preview-caption-top">{targetLabel}</p>
-          <div className="qr-grid-canvas qr-preview-safe">
-            {qrBlob ? <img src={qrBlob} alt="QR" key={previewSignature} /> : <div className="qr-placeholder">…</div>}
-          </div>
-          <p className="emp-meta" style={{ textAlign: 'center', marginTop: '0.5rem' }}>{company?.name}</p>
         </div>
       </div>
 
